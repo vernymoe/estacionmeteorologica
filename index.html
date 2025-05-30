@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Estación Meteorológica - Pronóstico Local</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
+    table, th, td {
+      border: 1px solid black;
+      border-collapse: collapse;
+      padding: 8px;
+      text-align: center;
+    }
+    th {
+      background-color: #f2f2f2;
+    }
+    input {
+      width: 100px;
+    }
+    .results {
+      margin-top: 20px;
+    }
+    .chart-container {
+      margin-top: 30px;
+    }
+    canvas {
+      max-width: 100%;
+    }
+    #botonDescargar {
+      margin-top: 20px;
+      padding: 10px 20px;
+      font-size: 16px;
+    }
+    .meta-info {
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+
+  <div style="display: flex; align-items: center; max-width: 600px; margin: 0 auto; padding: 10px 20px; background-color: #f0f0f0;">
+    <img 
+      src="C:\\Users\\50685\\Documents\\estacion meteorologica\\logo.png"
+      alt="Escudo del Liceo" 
+      style="width: 80px; height: auto; border-radius: 8px; margin-right: 15px;"
+    />
+    <h1 style="margin: 0; font-size: 24px;">Liceo San Rafael de Alajuela</h1>
+  </div>
+
+  <div class="meta-info">
+    <label for="fecha">Fecha:</label>
+    <input type="date" id="fecha"><br><br>
+
+    <label for="ubicacion">Ubicación (lat, lon):</label>
+    <input type="text" id="ubicacion" readonly><br><br>
+  </div>
+
+  <h2>Informe de observación meteorológica</h2>
+
+  <table id="tablaDatos">
+    <thead>
+      <tr>
+        <th>Hora</th>
+        <th>Temperatura (°C)</th>
+        <th>Presión (hPa)</th>
+        <th>Humedad (%)</th>
+        <th>Vel. Viento (km/h)</th>
+        <th>Dir. Viento</th>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- Seis filas -->
+      <tr><td><input type="time"></td><td><input type="number"></td><td><input type="number"></td><td><input type="number"></td><td><input type="number"></td><td><input type="text"></td></tr>
+      <tr><td><input type="time"></td><td><input type="number"></td><td><input type="number"></td><td><input type="number"></td><td><input type="number"></td><td><input type="text"></td></tr>
+      <tr><td><input type="time"></td><td><input type="number"></td><td><input type="number"></td><td><input type="number"></td><td><input type="number"></td><td><input type="text"></td></tr>
+      <tr><td><input type="time"></td><td><input type="number"></td><td><input type="number"></td><td><input type="number"></td><td><input type="number"></td><td><input type="text"></td></tr>
+      <tr><td><input type="time"></td><td><input type="number"></td><td><input type="number"></td><td><input type="number"></td><td><input type="number"></td><td><input type="text"></td></tr>
+      <tr><td><input type="time"></td><td><input type="number"></td><td><input type="number"></td><td><input type="number"></td><td><input type="number"></td><td><input type="text"></td></tr>
+    </tbody>
+  </table>
+
+  <div class="results" id="resultados"></div>
+
+  <div class="chart-container">
+    <canvas id="graficoPresion"></canvas>
+    <canvas id="graficoHumedad"></canvas>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    // Obtener geolocalización
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(function(pos) {
+        document.getElementById("ubicacion").value = pos.coords.latitude.toFixed(4) + ", " + pos.coords.longitude.toFixed(4);
+      });
+    }
+
+    const tabla = document.getElementById("tablaDatos");
+    tabla.addEventListener("input", analizarTendencias);
+
+    function analizarTendencias() {
+      const filas = Array.from(tabla.querySelectorAll("tbody tr"));
+      const datos = filas.map(fila => {
+        const celdas = fila.querySelectorAll("input");
+        const valores = Array.from(celdas).map(c => c.value);
+        return valores.some(v => v === "") ? null : valores.map((v, i) => i === 0 ? v : parseFloat(v));
+      }).filter(r => r);
+
+      if (datos.length < 2) return;
+
+      function tendencia(idx) {
+        const arr = datos.map(d => d[idx]);
+        const difs = arr.slice(1).map((v, i) => v - arr[i]);
+        const suma = difs.reduce((a,b) => a + b, 0);
+        if (suma > 0) return "aumenta";
+        if (suma < 0) return "disminuye";
+        return "permanece constante";
+      }
+
+      const t = tendencia(1);
+      const p = tendencia(2);
+      const h = tendencia(3);
+      const v = tendencia(4);
+
+      const dirCambios = new Set(datos.map(d => d[5]));
+      const dir = dirCambios.size > 1 ? "cambia" : "permanece constante";
+
+      let pronostico = "Condiciones estables";
+      if (p === "disminuye" && h === "aumenta") pronostico = "Posibilidad de lluvia";
+      else if (t === "aumenta" && p === "aumenta") pronostico = "Condiciones cálidas y estables";
+      else if (p === "aumenta" && h === "disminuye") pronostico = "Clima seco y estable";
+
+      document.getElementById("resultados").innerHTML = `
+        <p><strong>Tendencias:</strong></p>
+        <ul>
+          <li>Temperatura: ${t}</li>
+          <li>Presión: ${p}</li>
+          <li>Humedad: ${h}</li>
+          <li>Velocidad del viento: ${v}</li>
+          <li>Dirección del viento: ${dir}</li>
+        </ul>
+        <p><strong>Pronóstico:</strong> ${pronostico}</p>
+      `;
+
+      graficar(datos.map(d => d[2]), 'graficoPresion', 'Presión (hPa)', 'rgba(255, 99, 132, 0.6)');
+      graficar(datos.map(d => d[3]), 'graficoHumedad', 'Humedad (%)', 'rgba(54, 162, 235, 0.6)');
+    }
+
+    function graficar(data, id, label, color) {
+      const ctx = document.getElementById(id);
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: data.map((_, i) => i + 1),
+          datasets: [{
+            label: label,
+            data: data,
+            borderColor: color,
+            backgroundColor: color,
+            fill: false
+          }]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            y: { beginAtZero: false }
+          }
+        }
+      });
+    }
+  </script>
+
+<!-- Botón para descargar CSV -->
+<button id="botonDescargar">Descargar CSV</button>
+
+<script>
+  document.getElementById("botonDescargar").addEventListener("click", () => {
+    const fecha = document.getElementById("fecha").value || "Sin especificar";
+    const ubicacion = document.getElementById("ubicacion").value || "Sin especificar";
+
+    const filas = Array.from(document.querySelectorAll("#tablaDatos tbody tr"));
+    const encabezados = ["Hora", "Temperatura (°C)", "Presión (hPa)", "Humedad (%)", "Vel. Viento (km/h)", "Dir. Viento"];
+    
+    let csvContent = `Fecha:,${fecha}\nUbicación:,${ubicacion}\n\n`;
+    csvContent += encabezados.join(",") + "\n";
+
+    let datos = [];
+
+    filas.forEach(fila => {
+      const celdas = fila.querySelectorAll("input");
+      const filaValores = Array.from(celdas).map(celda => celda.value || "");
+      if (filaValores.some(val => val !== "")) {
+        csvContent += filaValores.join(",") + "\n";
+        datos.push(filaValores.map((v, i) => i === 0 ? v : parseFloat(v)));
+      }
+    });
+
+    // Si hay suficientes datos, agregamos tendencias y pronóstico
+    if (datos.length >= 2) {
+      function tendencia(idx) {
+        const arr = datos.map(d => d[idx]);
+        const difs = arr.slice(1).map((v, i) => v - arr[i]);
+        const suma = difs.reduce((a,b) => a + b, 0);
+        if (suma > 0) return "aumenta";
+        if (suma < 0) return "disminuye";
+        return "permanece constante";
+      }
+
+      const t = tendencia(1);
+      const p = tendencia(2);
+      const h = tendencia(3);
+      const v = tendencia(4);
+
+      const dirCambios = new Set(datos.map(d => d[5]));
+      const dir = dirCambios.size > 1 ? "cambia" : "permanece constante";
+
+      let pronostico = "Condiciones estables";
+      if (p === "disminuye" && h === "aumenta") pronostico = "Posibilidad de lluvia";
+      else if (t === "aumenta" && p === "aumenta") pronostico = "Condiciones cálidas y estables";
+      else if (p === "aumenta" && h === "disminuye") pronostico = "Clima seco y estable";
+
+      csvContent += "\nTendencias:\n";
+      csvContent += `Temperatura:,${t}\nPresión:,${p}\nHumedad:,${h}\nVel. Viento:,${v}\nDir. Viento:,${dir}\n`;
+      csvContent += `\nPronóstico:,${pronostico}\n`;
+    }
+
+    // Crear y descargar archivo
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.setAttribute("href", url);
+    a.setAttribute("download", "informe_meteorologico.csv");
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  });
+</script>
+
+</body>
+</html>
+
